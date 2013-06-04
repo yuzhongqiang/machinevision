@@ -36,8 +36,6 @@ typedef struct tagBMPFILEHEADER {
     unsigned long bfOffBits;  //offset of data area
 }BMPHEADER;
 
-BMPHEADER bmpheader;
-
 /* Bitmap info header */
 typedef struct tagBMPINFOHEADER {
     DWORD biSize;    //size of this structure, usually 0x28 bytes
@@ -54,8 +52,6 @@ typedef struct tagBMPINFOHEADER {
     DWORD biClrImportant;
 }BMPINFOHEADER;
 
-BMPINFOHEADER bmpinfoheader;
-
 /* Color plane (optional) */
 typedef struct tagBMPRGBQUAD {
     BYTE rgbBlue;
@@ -64,8 +60,6 @@ typedef struct tagBMPRGBQUAD {
     BYTE rgbReserved;
 }BMPRGBQUAD;
 
-BMPRGBQUAD *bmprgbquad;
-
 /* Bitmap data */
 typedef struct tagIMAGEDATA {
     BYTE red;
@@ -73,9 +67,23 @@ typedef struct tagIMAGEDATA {
     BYTE blue;
 }IMAGEDATA;
 
-IMAGEDATA *imagedata;
 
 
+
+image_t* bmpLoadImage(const char* filename, int iscolor)
+{
+	image_t image;
+
+	memset(&image, 0, sizeof(image_t));
+
+
+
+
+
+
+
+	
+}
 
 
 
