@@ -6,14 +6,12 @@
 #ifndef _IMAGE_H_
 #define _IMAGE_H_
 
-
-typedef struct image_codec_s {
-
-} image_codec_t;
+typedef enum {TYPE_UNKNOWN=0, TYPE_BMP=1, TYPE_JPEG, TYPE_MAX} IMAGE_TYPE;
 
 image_t* mvLoadImage(const char* filename, int iscolor);
-//int mvSaveImage(const char* filename, image_t *image, int iscolor);
+int mvSaveImage(const char* filename, image_t *image, int iscolor);
 
+IMAGE_TYPE mvGetImageType(const char* filename);
 
 
 #endif //_IMAGE_H_
