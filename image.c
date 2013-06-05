@@ -11,6 +11,15 @@
 #include "types.h"
 #include "image.h"
 
+image_t* mvCreateImageHeader(int width, int height, int channels)
+{
+    return NULL;
+}
+
+image_t* mvCreateImage(int width, int height, int channels)
+{
+    return NULL;
+}
 
 IMAGE_TYPE mvGetImageType(const char* filename)
 {
@@ -71,6 +80,8 @@ image_t* mvLoadImage(const char* filename, int iscolor)
 
 int mvSaveImage(const char* filename, image_t* image, int iscolor)
 {
+
+
 
 }
 

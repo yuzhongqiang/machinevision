@@ -79,10 +79,8 @@ typedef struct image_s
     int  width;             /* Image width in pixels.                           */
     int  height;            /* Image height in pixels.                          */
     int  imageSize;         /* Image data size in bytes */
-    char *imageData;        /* Pointer to aligned image data.         */
+    char *data;        /* Pointer to aligned image data.         */
 } image_t;
-
-
 
 
 
