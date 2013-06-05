@@ -21,6 +21,51 @@ image_t* mvCreateImage(int width, int height, int channels)
     return NULL;
 }
 
+/* Only create image header */
+image_t* mvCreateImageHeader(int width, int height, int channels, int depth)
+{
+	image_t *image = NULL;
+	int ret;
+
+	image = malloc(sizeof(image_t));
+	if (NULL == image) {
+		return E_NOMEM;
+	}
+
+	image->width = width;
+	image->height = height;
+	image->channels = channels;
+	image->depth = depth;
+
+	return image;
+}
+
+void mvReleaseImageHeader(image_t *image)
+{
+	free(image);
+}
+
+/* Create image structure and allocate data space */
+image_t* mvCreateImage(int width, int height, int channels, int depth)
+{
+	image_t *image = NULL;
+	int ret;
+
+	image = malloc(sizeof(image_t));
+	if (NULL == image) {
+		return E_NOMEM;
+	}
+
+	image->width = width;
+	image->height = height;
+	image->channels = channels;
+	image->depth = depth;
+
+	return image;
+}
+
+
+
 IMAGE_TYPE mvGetImageType(const char* filename)
 {
 	int i, j = strlen(filename) - 1;

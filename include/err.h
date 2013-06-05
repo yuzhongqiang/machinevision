@@ -10,6 +10,7 @@
 #define RET_OK  0
 
 #define E_PARAM -1     // Invalide parameter
+#define E_NOMEM -2     // No memory to allcate
 
 
 #endif  //_ERR_H_
