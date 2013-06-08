@@ -5,14 +5,9 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 
-typedef unsigned char  u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef char  s8;
-typedef short s16;
-typedef int s32;
-
+#include "types.h"
 
 /* Bitmap file structure */
 /*
@@ -36,7 +31,7 @@ typedef int s32;
 */
 
 /* Bitmap file header */
-typedef struct {
+typedef struct file_header_t {
     u16 Flag; //Bitmap file flag: "BM"
     u32 FileSize; //file size
     u16 Reserved1;  //0x00 0x00
@@ -45,7 +40,7 @@ typedef struct {
 }file_header_t;
 
 /* Bitmap info header */
-typedef struct {
+typedef struct info_header_t {
     u32 Size;    //size of this structure, usually 0x28 bytes
     u32 Width;    //image width
     u32 Height;   //image height
@@ -61,7 +56,7 @@ typedef struct {
 }info_header_t;
 
 /* Color plane (optional) */
-typedef struct {
+typedef struct rgb_plate_t {
     u8 Blue;
     u8 Green;
     u8 Red;
@@ -69,22 +64,22 @@ typedef struct {
 }rgb_plate_t;
 
 /* Bitmap data */
-typedef struct {
+typedef struct rgb_pixel_t {
     u8 red;
     u8 Green;
     u8 Blue;
-}image_data_t;
+}rgb_pixel_t;
 
 image_t* bmpLoadImage(const char* filename, int iscolor)
 {
-    int i, ret = NULL;
+    int i, ret = 0;
     int row;
     int plate_len = 0;
     int line_bytes;
     file_header_t hdr;
     info_header_t ihdr;
+
     rgb_plate_t* plate = NULL;
-    image_data_t data;
     image_t *image = NULL;
     u8 *data;
     FILE *fp;
@@ -93,13 +88,13 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     if (NULL == fp)
         return NULL;
 
-    if (fread(&hdr, sizeof(file_header_t), 1, fd) != 1)
+    if (fread(&hdr, sizeof(file_header_t), 1, fp) != 1)
         goto err1;
     if (hdr.Flag != 0x424d)  //"BM"
         goto err1;
 
-    if (fread(&ihdr, sizeof(info_header_t), 1, fd) != 1)
-        return goto err1;
+    if (fread(&ihdr, sizeof(info_header_t), 1, fp) != 1)
+        goto err1;
     if (ihdr.Size != sizeof(ihdr))
         goto err1;
         
@@ -110,7 +105,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     /* get color plate */
     plate_len = hdr.OffBits - sizeof(file_header_t) - sizeof(info_header_t);
     if (plate_len > 0) {
-        plate = (rgb_plate_t*)malloc(plate_len);
+        plate = (rgb_plate_t*)mvAlloc(plate_len);
         if (NULL == plate)
             goto err1;
 
@@ -122,7 +117,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
 
     /* now file pointer to the data area */
     line_bytes = (ihdr.BitPerPels * ihdr.Width + 7) / 8;
-    data = (u8*)malloc(line_bytes);
+    data = (u8*)mvAlloc(line_bytes);
     if (NULL == data)
         goto err2;
 
@@ -132,7 +127,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
         switch (ihdr.BitPerPels) {
             case 1:
                 for (i=0; i<ihdr.Width; i++) {
-                    image->data
+                    ;//image->data
                 }
                 break;
 

@@ -1,8 +1,11 @@
 # Makefile
 
-SRC_FILES := mat.c  utils.c
+SRC_FILES := utils.c mat.c bmp.c
+INC_DIR := include
 
-OBJ_FILES := $(SRC_FILES: .c=.o)
+CFLAGS += -I$(INC_DIR)
+
+OBJ_FILES := $(SRC_FILES:.c=.o)
 
 LIB_FILE := libmv.a
 

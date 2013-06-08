@@ -16,10 +16,9 @@
 \**********************************************************************/
 
 // Allocates underlying array data
-void mvCreateData( mat_t* arr )
+void mvCreateData( mat_t* mat)
 {
     size_t step, total_size;
-    mat_t* mat = (mat_t*)arr;
     step = mat->step;
 
     if( mat->rows == 0 || mat->cols == 0 )
@@ -51,16 +50,6 @@ void cvReleaseData( mat_t* arr )
 {
 }
 
-
-// Creates mat_t and underlying data
-mat_t* mvCreateMat( int height, int width, int type )
-{
-    mat_t* arr = mvCreateMatHeader( height, width, type );
-    mvCreateData( arr );
-
-    return arr;
-}
-
 // Creates mat_t header only
 mat_t* mvCreateMatHeader( int rows, int cols, int type )
 {
@@ -71,13 +60,21 @@ mat_t* mvCreateMatHeader( int rows, int cols, int type )
     if( min_step <= 0 )
         mvError( MV_StsUnsupportedFormat, "Invalid matrix type" );
 
-    mat_t* arr = (mat_t*)mvAlloc( sizeof(*arr));
+    mat_t* arr = (mat_t*)mvAlloc(sizeof(*arr));
 
     arr->step = min_step;
     arr->type = type;
     arr->rows = rows;
     arr->cols = cols;
-    arr->hdr_refcount = 1;
+
+    return arr;
+}
+
+// Creates mat_t and underlying data
+mat_t* mvCreateMat( int height, int width, int type )
+{
+    mat_t* arr = (mat_t*)mvCreateMatHeader( height, width, type );
+    mvCreateData( arr );
 
     return arr;
 }
@@ -109,7 +106,7 @@ void mvReleaseMat( mat_t** array )
 {
     if( !array )
         mvError( MV_HeaderIsNull, "" );
-
+#if 0
     if( *array )
     {
         mat_t* arr = *array;
@@ -121,8 +118,8 @@ void mvReleaseMat( mat_t** array )
 
         mvFree( &arr );
     }
+#endif
 }
-
 
 // Creates a copy of matrix
 mat_t*
@@ -136,7 +133,7 @@ mvCloneMat( const mat_t* src )
     if( src->data.ptr )
     {
         mvCreateData( dst );
-        mvCopy( src, dst );
+        //mvCopy( src, dst );
     }
 
     return dst;

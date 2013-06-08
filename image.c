@@ -113,7 +113,7 @@ image_t* mvLoadImage(const char* filename, int iscolor)
         break;
 
     case TYPE_JPEG:
-        img = jpegLoadImage(filename, iscolor);
+        //img = jpegLoadImage(filename, iscolor);
         break;
 
     case TYPE_UNKNOWN:

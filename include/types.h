@@ -8,11 +8,11 @@
 #define _TYPES_H_
 
 #define MV_INLINE inline
-#define int64 long long;
 
 typedef unsigned char u8;
-typedef unsigned unsigned short u16;
+typedef unsigned short u16;
 typedef unsigned int u32;
+typedef long long int64;
 
 /****************************************************************************************\
 *                                  Matrix type (mat_t)                                   *
@@ -83,6 +83,8 @@ typedef unsigned int u32;
 #define MV_64FC3 MV_MAKETYPE(MV_64F,3)
 #define MV_64FC4 MV_MAKETYPE(MV_64F,4)
 
+#define MV_ELEM_TYPE(x)
+
 #define MV_ELEM_SIZE(type) (((MV_ELEM_DEPTH(type))/2+1)  \
             * ((MV_ELEM_CHN(type)) == 3 ? 4 : (MV_ELEM_CHN(type))))
 
@@ -93,7 +95,7 @@ typedef struct mat_t
 
     union
     {
-        uchar* ptr;
+        u8* ptr;
         short* s;
         int* i;
         float* fl;
@@ -104,9 +106,9 @@ typedef struct mat_t
     int cols;
 }mat_t;
 
-MV_INLINE mat( int rows, int cols, int type, void* data)
+MV_INLINE mat_t mat( int rows, int cols, int type, void* data)
 {
-    CvMat m;
+    mat_t m;
 
     assert( (u32)MV_ELEM_DEPTH(type) <= MV_64F );
     m.cols = cols;
@@ -130,98 +132,83 @@ MV_INLINE mat( int rows, int cols, int type, void* data)
     (*(elemtype*)MV_MAT_ELEM_PTR_FAST( mat, row, col, sizeof(elemtype)))
 
 
-MV_INLINE  double  cvmGet( const CvMat* mat, int row, int col )
+MV_INLINE  u8*  mvGetm( const mat_t* mat, int row, int col)
 {
-    int type;
-
-    type = MV_MAT_TYPE(mat->type);
     assert( (unsigned)row < (unsigned)mat->rows &&
             (unsigned)col < (unsigned)mat->cols );
 
-    if( type == MV_32FC1 )
-        return ((float*)(mat->data.ptr + (size_t)mat->step*row))[col];
-    else
-    {
-        assert( type == MV_64FC1 );
-        return ((double*)(mat->data.ptr + (size_t)mat->step*row))[col];
-    }
+    return (u8*)(((u8*)(mat->data.ptr + mat->step*row))+MV_ELEM_SIZE(mat->type)*col);
 }
 
 
-MV_INLINE  void  cvmSet( CvMat* mat, int row, int col, double value )
+MV_INLINE  void  mvSetm( mat_t* mat, int row, int col, u8* value )
 {
-    int type;
-    type = MV_MAT_TYPE(mat->type);
     assert( (unsigned)row < (unsigned)mat->rows &&
             (unsigned)col < (unsigned)mat->cols );
 
-    if( type == MV_32FC1 )
-        ((float*)(mat->data.ptr + (size_t)mat->step*row))[col] = (float)value;
-    else
-    {
-        assert( type == MV_64FC1 );
-        ((double*)(mat->data.ptr + (size_t)mat->step*row))[col] = (double)value;
-    }
+    mvCopy((void*)(((u8*)(mat->data.ptr + mat->step*row))+MV_ELEM_SIZE(mat->type)*col),
+                (void*)value, MV_ELEM_SIZE(mat->type));
 }
 
-
-MV_INLINE int cvIplDepth( int type )
-{
-    int depth = MV_MAT_DEPTH(type);
-    return MV_ELEM_SIZE1(depth)*8 | (depth == MV_8S || depth == MV_16S ||
-           depth == MV_32S ? IPL_DEPTH_SIGN : 0);
-}
-
-typedef struct point2i_s {
+typedef struct point2i_t {
 	int x;
 	int y;
 } point2i_t;
 
-typedef struct point2f_s {
+typedef struct point2f_t {
 	float x;
 	float y;
-} point2df_t;
+} point2f_t;
 
-typedef struct point2d_s {
+typedef struct point2d_t {
 	double x;
 	double y;
-};
+}point2d_t;
 
 
-typedef struct point3_s {
+typedef struct point3i_t {
 	int x;
 	int y;
 	int z;
-} point2d_t;
+} point3i_t;
 
-typedef struct point3f_s {
+typedef struct point3f_t {
 	float x;
 	float y;
 	float z;
-} point2df_t;
+} point3f_t;
 
-typedef struct point3d_s {
+typedef struct point3d_t {
 	double x;
 	double y;
 	double z;
-} point3f_t;
+} point3d_t;
 
+/**********************************************************************************\
+*                                                 Image structure definition                                                    *
+\**********************************************************************************/
 
-/* Image structure definition */
+#define IMG_DEPTH_SIGN 0x80000000
 
-typedef struct image_s
-{
-    int  channels;         /* Most of OpenCV functions support 1,2,3 or 4 channels */
-    int  depth;             /* Pixel depth in bits:  */
-    int  width;             /* Image width in pixels.                           */
-    int  height;            /* Image height in pixels.                          */
-    int  imageSize;         /* Image data size in bytes */
-    char *data;        /* Pointer to aligned image data.         */
+#define IMG_DEPTH_1U     1
+#define IMG_DEPTH_8U     8
+#define IMG_DEPTH_16U   16
+#define IMG_DEPTH_32F   32
+
+#define IMG_DEPTH_8S  (IMG_DEPTH_SIGN| 8)
+#define IMG_DEPTH_16S (IMG_DEPTH_SIGN|16)
+#define IMG_DEPTH_32S (IMG_DEPTH_SIGN|32)
+
+typedef struct image_t {
+    int  Size;            /* size of struct image_t */
+    int  Channels;         /* Most of OpenCV functions support 1,2,3 or 4 channels */
+    int  Depth;             /* Pixel depth in bits: IPL_DEPTH_8U, IPL_DEPTH_8S, IPL_DEPTH_16S,
+                               IPL_DEPTH_32S, IPL_DEPTH_32F and IPL_DEPTH_64F are supported.  */
+    int  Width;             /* Image width in pixels.                           */
+    int  Height;            /* Image height in pixels.                          */
+    int  ImageSize;         /* Image data size in bytes */
+    char *Data;        /* Pointer to aligned image data. */
 } image_t;
-
-
-
-
 
 
 
