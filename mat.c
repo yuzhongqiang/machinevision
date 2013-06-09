@@ -30,7 +30,7 @@ void mvCreateData( mat_t* mat)
     if( step == 0 )
         step = MV_ELEM_SIZE(mat->type) * mat->cols;
 
-    int64 _total_size = (int64)step*mat->rows + sizeof(int) + MV_MALLOC_ALIGN;
+    int64 _total_size = (int64)step*mat->rows + MV_MALLOC_ALIGN;
     total_size = (size_t)_total_size;
     if(_total_size != (int64)total_size)
         mvError(MV_StsNoMem, "Too big buffer is allocated" );

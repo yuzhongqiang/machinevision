@@ -18,7 +18,8 @@ void mvFree(void* buf)
     free(buf);
 }
 
-void mvError(const char* msg)
+void mvError(int code, const char* func_name, const char* msg
+                       const char* file_name, int line)
 {
 
 }

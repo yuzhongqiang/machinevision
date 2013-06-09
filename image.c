@@ -11,11 +11,6 @@
 #include "types.h"
 #include "image.h"
 
-image_t* mvCreateImageHeader(int width, int height, int channels)
-{
-    return NULL;
-}
-
 image_t* mvCreateImage(int width, int height, int channels)
 {
     return NULL;

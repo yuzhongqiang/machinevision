@@ -44,10 +44,13 @@ typedef struct info_header_t {
     u32 Size;    //size of this structure, usually 0x28 bytes
     u32 Width;    //image width
     u32 Height;   //image height
-    u16 Plates;   //planes count, always 1
+    u16 Planes;   //planes count, always 1
     u16 BitPerPels; //bits count per pixel
     u32 Compression;  //compression type: 
-                          //0-no compress; 1-8bits compression; 2:4bits compression
+                      /* 0: no compress;
+			      1: RLE 8 compression(BI_RLE8)
+			      2: RLE 4 compression(BI_RLE4)
+			      3: Bitfields(BI_BITFIELDS)  */
     u32 DataSize;    //size of data area
     u32 XPelsPerMeter; //horizontal pixels per meter
     u32 YPelsPerMeter; //vertical pixels per meter
@@ -98,10 +101,6 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     if (ihdr.Size != sizeof(ihdr))
         goto err1;
         
-    image = mvCreateImageHeader(ihdr.Width, ihdr.Height, ihdr.Plates);
-    if (NULL == image)
-        goto err1;
-
     /* get color plate */
     plate_len = hdr.OffBits - sizeof(file_header_t) - sizeof(info_header_t);
     if (plate_len > 0) {
@@ -126,8 +125,12 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
         row--;
         switch (ihdr.BitPerPels) {
             case 1:
+                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, 1);
+                if (NULL == image)
+                goto err1;
                 for (i=0; i<ihdr.Width; i++) {
-                    ;//image->data
+
+                    
                 }
                 break;
 

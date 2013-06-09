@@ -85,8 +85,7 @@ typedef long long int64;
 
 #define MV_ELEM_TYPE(x)
 
-#define MV_ELEM_SIZE(type) (((MV_ELEM_DEPTH(type))/2+1)  \
-            * ((MV_ELEM_CHN(type)) == 3 ? 4 : (MV_ELEM_CHN(type))))
+#define MV_ELEM_SIZE(type) ((MV_ELEM_DEPTH(type))/2+1)*MV_ELEM_CHN(type)
 
 typedef struct mat_t
 {
