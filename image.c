@@ -27,6 +27,7 @@ image_t* mvCreateImageHeader(int width, int height, int channels, int depth)
 		return E_NOMEM;
 	}
 
+    image->Size = sizeof(image_t);
 	image->width = width;
 	image->height = height;
 	image->channels = channels;

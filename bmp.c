@@ -73,6 +73,11 @@ typedef struct rgb_pixel_t {
     u8 Blue;
 }rgb_pixel_t;
 
+void mat1b28u(u8* data, mat_t *mat)
+{
+
+}
+
 image_t* bmpLoadImage(const char* filename, int iscolor)
 {
     int i, ret = 0;
@@ -125,13 +130,13 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
         row--;
         switch (ihdr.BitPerPels) {
             case 1:
-                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, 1);
+                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, IMG_DEPTH_8U);
+                image->ImageSize = ihdr.Width * ihdr.Height;
                 if (NULL == image)
-                goto err1;
-                for (i=0; i<ihdr.Width; i++) {
-
-                    
-                }
+                    goto err1;
+                mat_t *mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC1);
+                mat1b28u(data, mat);
+                image->Data = mat;
                 break;
 
             case 2:
@@ -150,6 +155,13 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 break;
                 
             case 24:
+                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, IMG_DEPTH_32S);
+                image->ImageSize = ihdr.Width * ihdr.Height;
+                if (NULL == image)
+                    goto err1;
+                mat_t *mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC3  );
+                mat1b28u(data, mat);
+                image->Data = mat;
                 break;
                 
             case 32:
