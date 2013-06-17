@@ -73,9 +73,30 @@ typedef struct rgb_pixel_t {
     u8 Blue;
 }rgb_pixel_t;
 
-void mat1b28u(u8* data, mat_t *mat)
+MV_STATIC void mat1b2u8(u8* data, int row, u32 width, mat_t *mat)
 {
+    int i = 7, w = 0;
+    u8 mask;
+    u8* ptr = mat->data.ptr + row * mat->step;
 
+    for (; w<width; w++) {
+        mask = 0x01 << i;
+        i--;
+        if (i<0)
+            i = 7;
+        ptr[w] = data[w/8] & mask ? 1 : 0;
+    }
+}
+
+MV_STATIC void mat24b2s32(u8* data, int row, u32 width, mat_t *mat)
+{
+    int i = 0;
+    int* ptr = (int*)(mat->data.ptr + row * mat->step);
+
+    for (; i<width; i++) {
+        /* color order in bitmap file is {blue, green, red} */
+        ptr[i] = data[i] | data[i+1]<<8 | data[i+2]<<16;
+    }
 }
 
 image_t* bmpLoadImage(const char* filename, int iscolor)
@@ -86,6 +107,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     int line_bytes;
     file_header_t hdr;
     info_header_t ihdr;
+    mat_t *mat = NULL;
 
     rgb_plate_t* plate = NULL;
     image_t *image = NULL;
@@ -134,8 +156,8 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 image->ImageSize = ihdr.Width * ihdr.Height;
                 if (NULL == image)
                     goto err1;
-                mat_t *mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC1);
-                mat1b28u(data, mat);
+                mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC1);
+                mat1b2u8(data, row, ihdr.Width, mat);
                 image->Data = mat;
                 break;
 
@@ -159,8 +181,8 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 image->ImageSize = ihdr.Width * ihdr.Height;
                 if (NULL == image)
                     goto err1;
-                mat_t *mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC3  );
-                mat1b28u(data, mat);
+                mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC3);
+                mat24b2u32(data, mat);
                 image->Data = mat;
                 break;
                 

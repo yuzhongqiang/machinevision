@@ -8,6 +8,7 @@
 #define _TYPES_H_
 
 #define MV_INLINE inline
+#define MV_STATIC static
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -90,7 +91,7 @@ typedef long long int64;
 typedef struct mat_t
 {
     u32 type;
-    int step;
+    int step;   /* matrix row step in bytes */
 
     union
     {
