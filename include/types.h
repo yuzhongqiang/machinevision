@@ -10,10 +10,31 @@
 #define MV_INLINE inline
 #define MV_STATIC static
 
+
+#define MV_FUNCNAME(x)
+#define MV_ERROR(x,y)
+
+
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 typedef long long int64;
+
+typedef struct MvSize
+{
+    int width;
+    int height;
+}MvSize;
+
+MV_INLINE  MvSize  mvSize( int width, int height )
+{
+    MvSize s;
+
+    s.width = width;
+    s.height = height;
+
+    return s;
+}
 
 /****************************************************************************************\
 *                                  Matrix type (mat_t)                                   *

@@ -1,9 +1,10 @@
 # Makefile
 
-SRC_FILES := utils.c mat.c bmp.c
-INC_DIR := include
+SRC_FILES := utils.c mat.c bmp.c wnd_gtk.c
+INC_DIR := include/
+GTK_INC := `pkg-config --cflags gtk+-2.0`
 
-CFLAGS += -I$(INC_DIR)
+CFLAGS += -I$(INC_DIR) -I$(GTK_INC)
 
 OBJ_FILES := $(SRC_FILES:.c=.o)
 

@@ -3,21 +3,10 @@
 *
 */
 
-#include "precomp.hpp"
-
-#ifndef WIN32
-
-#ifdef HAVE_GTK
-
 #include "gtk/gtk.h"
 #include "gdk/gdkkeysyms.h"
 #include <stdio.h>
-
-#ifdef HAVE_OPENGL
-    #include <gtk/gtkgl.h>
-    #include <GL/gl.h>
-    #include <GL/glu.h>
-#endif
+#include "types.h"
 
 // TODO Fix the initial window size when flags=0.  Right now the initial window is by default
 // 320x240 size.  A better default would be actual size of the image.  Problem
@@ -27,33 +16,83 @@
 // in totem/src/backend/bacon-video-widget-xine.c
 
 ////////////////////////////////////////////////////////////
-// MvImageWidget GTK Widget Public API
+// image_widget_t GTK Widget Public API
 ////////////////////////////////////////////////////////////
-typedef struct _MvImageWidget        MvImageWidget;
-typedef struct _MvImageWidgetClass   MvImageWidgetClass;
+typedef struct _image_widget_t        image_widget_t;
+typedef struct _image_widget_class_t   image_widget_class_t;
 
-struct _MvImageWidget {
+enum
+{
+    MV_EVENT_MOUSEMOVE      =0,
+    MV_EVENT_LBUTTONDOWN    =1,
+    MV_EVENT_RBUTTONDOWN    =2,
+    MV_EVENT_MBUTTONDOWN    =3,
+    MV_EVENT_LBUTTONUP      =4,
+    MV_EVENT_RBUTTONUP      =5,
+    MV_EVENT_MBUTTONUP      =6,
+    MV_EVENT_LBUTTONDBLCLK  =7,
+    MV_EVENT_RBUTTONDBLCLK  =8,
+    MV_EVENT_MBUTTONDBLCLK  =9
+};
+
+enum
+{
+    MV_EVENT_FLAG_LBUTTON   =1,
+    MV_EVENT_FLAG_RBUTTON   =2,
+    MV_EVENT_FLAG_MBUTTON   =4,
+    MV_EVENT_FLAG_CTRLKEY   =8,
+    MV_EVENT_FLAG_SHIFTKEY  =16,
+    MV_EVENT_FLAG_ALTKEY    =32
+};
+typedef void (*MvMouseCallback )(int event, int x, int y, int flags, void* param);
+typedef void (*MvTrackbarCallback)(int pos);
+typedef void (*MvTrackbarCallback2)(int pos, void* userdata);
+
+struct _image_widget_t {
     GtkWidget widget;
-    MvMat * original_image;
-    MvMat * scaled_image;
+    mat_t * original_image;
+    mat_t * scaled_image;
     int flags;
 };
 
-struct _MvImageWidgetClass
+struct _image_widget_class_t
 {
   GtkWidgetClass parent_class;
+};
+// ---------  YV ---------
+enum
+{
+    //These 3 flags are used by cvSet/GetWindowProperty
+    MV_WND_PROP_FULLSCREEN = 0, //to change/get window's fullscreen property
+    MV_WND_PROP_AUTOSIZE   = 1, //to change/get window's autosize property
+    MV_WND_PROP_ASPECTRATIO= 2, //to change/get window's aspectratio property
+    MV_WND_PROP_OPENGL     = 3, //to change/get window's opengl support
+
+    //These 2 flags are used by cvNamedWindow and cvSet/GetWindowProperty
+    MV_WINDOW_NORMAL       = 0x00000000, //the user can resize the window (no constraint)  / also use to switch a fullscreen window to a normal size
+    MV_WINDOW_AUTOSIZE     = 0x00000001, //the user cannot resize the window, the size is constrainted by the image displayed
+    MV_WINDOW_OPENGL       = 0x00001000, //window with opengl support
+
+    //Those flags are only for Qt
+    MV_GUI_EXPANDED         = 0x00000000, //status bar and tool bar
+    MV_GUI_NORMAL           = 0x00000010, //old fashious way
+
+    //These 3 flags are used by cvNamedWindow and cvSet/GetWindowProperty
+    MV_WINDOW_FULLSCREEN   = 1,//change the window to fullscreen
+    MV_WINDOW_FREERATIO    = 0x00000100,//the image expends as much as it can (no ratio constraint)
+    MV_WINDOW_KEEPRATIO    = 0x00000000//the ration image is respected.
 };
 
 
 /** Allocate new image viewer widget */
-GtkWidget*     mvImageWidgetNew      (int flags);
+GtkWidget* mvImageWidgetNew(int flags);
 
 /** Set the image to display in the widget */
-void           mvImageWidgetSetImage(MvImageWidget * widget, const MvArr *arr);
+void mvImageWidgetSetImage(image_widget_t * widget, const void *arr);
 
 // standard GTK object macros
-#define MV_IMAGE_WIDGET(obj)          GTK_CHECK_CAST (obj, mvImageWidget_get_type (), MvImageWidget)
-#define MV_IMAGE_WIDGET_CLASS(klass)  GTK_CHECK_CLASS_CAST (klass, mvImageWidget_get_type (), MvImageWidgetClass)
+#define MV_IMAGE_WIDGET(obj)          GTK_CHECK_CAST (obj, mvImageWidget_get_type (), image_widget_t)
+#define MV_IMAGE_WIDGET_CLASS(klass)  GTK_CHECK_CLASS_CAST (klass, mvImageWidget_get_type (), image_widget_class_t)
 #define MV_IS_IMAGE_WIDGET(obj)       GTK_CHECK_TYPE (obj, mvImageWidget_get_type ())
 
 /////////////////////////////////////////////////////////////////////////////
@@ -66,16 +105,13 @@ static GtkWidgetClass * parent_class = NULL;
 // flag to help size initial window
 #define MV_WINDOW_NO_IMAGE 2
 
-void mvImageWidgetSetImage(MvImageWidget * widget, const MvArr *arr){
-    MvMat * mat, stub;
+void mvImageWidgetSetImage(image_widget_t * widget, const void *arr){
+    mat_t * mat, stub;
     int origin=0;
 
     //printf("mvImageWidgetSetImage\n");
 
-    if( MV_IS_IMAGE_HDR( arr ))
-        origin = ((IplImage*)arr)->origin;
-
-    mat = mvGetMat(arr, &stub);
+    //mat = mvGetMat(arr, &stub);
 
     if(widget->original_image && !MV_ARE_SIZES_EQ(mat, widget->original_image)){
         mvReleaseMat( &widget->original_image );
@@ -84,20 +120,19 @@ void mvImageWidgetSetImage(MvImageWidget * widget, const MvArr *arr){
         widget->original_image = mvCreateMat( mat->rows, mat->cols, MV_8UC3 );
         gtk_widget_queue_resize( GTK_WIDGET( widget ) );
     }
-    mvConvertImage( mat, widget->original_image,
-                            (origin != 0 ? MV_MVTIMG_FLIP : 0) + MV_MVTIMG_SWAP_RB );
+    //mvConvertImage( mat, widget->original_image,
+    //                        (origin != 0 ? MV_MVTIMG_FLIP : 0) + MV_MVTIMG_SWAP_RB );
     if(widget->scaled_image){
-        mvResize( widget->original_image, widget->scaled_image, MV_INTER_AREA );
+        //mvResize( widget->original_image, widget->scaled_image, MV_INTER_AREA );
     }
 
     // window does not refresh without this
     gtk_widget_queue_draw( GTK_WIDGET(widget) );
 }
 
-GtkWidget*
-mvImageWidgetNew (int flags)
+GtkWidget* mvImageWidgetNew (int flags)
 {
-  MvImageWidget *image_widget;
+  image_widget_t *image_widget;
 
   image_widget = MV_IMAGE_WIDGET( gtk_type_new (mvImageWidget_get_type ()) );
   image_widget->original_image = 0;
@@ -154,13 +189,11 @@ static void
 mvImageWidget_size_request (GtkWidget      *widget,
                        GtkRequisition *requisition)
 {
-    MvImageWidget * image_widget = MV_IMAGE_WIDGET( widget );
+    image_widget_t * image_widget = MV_IMAGE_WIDGET( widget );
 
     //printf("mvImageWidget_size_request ");
     // the case the first time mvShowImage called or when AUTOSIZE
-    if( image_widget->original_image &&
-        ((image_widget->flags & MV_WINDOW_AUTOSIZE) ||
-         (image_widget->flags & MV_WINDOW_NO_IMAGE)))
+    if( image_widget->original_image && image_widget->flags & MV_WINDOW_NO_IMAGE)
     {
         //printf("original ");
         requisition->width = image_widget->original_image->cols;
@@ -182,12 +215,11 @@ mvImageWidget_size_request (GtkWidget      *widget,
 }
 
 static void mvImageWidget_set_size(GtkWidget * widget, int max_width, int max_height){
-    MvImageWidget * image_widget = MV_IMAGE_WIDGET( widget );
+    image_widget_t * image_widget = MV_IMAGE_WIDGET( widget );
 
     //printf("mvImageWidget_set_size %d %d\n", max_width, max_height);
 
     // don't allow to set the size
-    if(image_widget->flags & MV_WINDOW_AUTOSIZE) return;
     if(!image_widget->original_image) return;
 
     MvSize scaled_image_size = mvImageWidget_calc_size( image_widget->original_image->cols,
@@ -211,7 +243,7 @@ static void
 mvImageWidget_size_allocate (GtkWidget     *widget,
                         GtkAllocation *allocation)
 {
-  MvImageWidget *image_widget;
+  image_widget_t *image_widget;
 
   //printf("mvImageWidget_size_allocate\n");
   g_return_if_fail (widget != NULL);
@@ -222,7 +254,7 @@ mvImageWidget_size_allocate (GtkWidget     *widget,
   image_widget = MV_IMAGE_WIDGET (widget);
 
 
-  if( (image_widget->flags & MV_WINDOW_AUTOSIZE)==0 && image_widget->original_image ){
+  if( image_widget->original_image ){
       // (re) allocated scaled image
       if( image_widget->flags & MV_WINDOW_NO_IMAGE ){
           mvImageWidget_set_size( widget, image_widget->original_image->cols,
@@ -231,16 +263,14 @@ mvImageWidget_size_allocate (GtkWidget     *widget,
       else{
           mvImageWidget_set_size( widget, allocation->width, allocation->height );
       }
-      mvResize( image_widget->original_image, image_widget->scaled_image, MV_INTER_AREA );
+      //mvResize( image_widget->original_image, image_widget->scaled_image, MV_INTER_AREA );
   }
 
   if (GTK_WIDGET_REALIZED (widget))
     {
       image_widget = MV_IMAGE_WIDGET (widget);
 
-      if( image_widget->original_image &&
-              ((image_widget->flags & MV_WINDOW_AUTOSIZE) ||
-               (image_widget->flags & MV_WINDOW_NO_IMAGE)) )
+      if( image_widget->original_image && image_widget->flags & MV_WINDOW_NO_IMAGE )
       {
           widget->allocation.width = image_widget->original_image->cols;
           widget->allocation.height = image_widget->original_image->rows;
@@ -263,7 +293,7 @@ mvImageWidget_size_allocate (GtkWidget     *widget,
 static void
 mvImageWidget_destroy (GtkObject *object)
 {
-  MvImageWidget *image_widget;
+  image_widget_t *image_widget;
 
   g_return_if_fail (object != NULL);
   g_return_if_fail (MV_IS_IMAGE_WIDGET (object));
@@ -277,7 +307,7 @@ mvImageWidget_destroy (GtkObject *object)
     (* GTK_OBJECT_CLASS (parent_class)->destroy) (object);
 }
 
-static void mvImageWidget_class_init (MvImageWidgetClass * klass)
+static void mvImageWidget_class_init (image_widget_class_t * klass)
 {
   GtkObjectClass *object_class;
   GtkWidgetClass *widget_class;
@@ -298,7 +328,7 @@ static void mvImageWidget_class_init (MvImageWidgetClass * klass)
 }
 
 static void
-mvImageWidget_init (MvImageWidget *image_widget)
+mvImageWidget_init (image_widget_t *image_widget)
 {
     image_widget->original_image=0;
     image_widget->scaled_image=0;
@@ -312,9 +342,9 @@ GtkType mvImageWidget_get_type (void){
     {
       static const GtkTypeInfo image_info =
       {
-        (gchar*)"MvImageWidget",
-        sizeof (MvImageWidget),
-        sizeof (MvImageWidgetClass),
+        (gchar*)"image_widget_t",
+        sizeof (image_widget_t),
+        sizeof (image_widget_class_t),
         (GtkClassInitFunc) mvImageWidget_class_init,
         (GtkObjectInitFunc) mvImageWidget_init,
         /* reserved_1 */ NULL,
@@ -328,38 +358,21 @@ GtkType mvImageWidget_get_type (void){
   return image_type;
 }
 /////////////////////////////////////////////////////////////////////////////
-// End MvImageWidget
+// End image_widget_t
 /////////////////////////////////////////////////////////////////////////////
 
 
-struct MvWindow;
+struct window_t;
+struct MvTrackbar;
 
-typedef struct MvTrackbar
+typedef struct window_t
 {
-    int signature;
-    GtkWidget* widget;
-    char* name;
-    MvTrackbar* next;
-    MvWindow* parent;
-    int* data;
-    int pos;
-    int maxval;
-    MvTrackbarCallback notify;
-    MvTrackbarCallback2 notify2;
-    void* userdata;
-}
-MvTrackbar;
-
-
-typedef struct MvWindow
-{
-    int signature;
     GtkWidget* widget;
     GtkWidget* frame;
     GtkWidget* paned;
     char* name;
-    MvWindow* prev;
-    MvWindow* next;
+    struct window_t* prev;
+    struct window_t* next;
 
     int last_key;
     int flags;
@@ -372,19 +385,24 @@ typedef struct MvWindow
     {
         int pos;
         int rows;
-        MvTrackbar* first;
+        struct MvTrackbar* first;
     }
     toolbar;
+}window_t;
 
-#ifdef HAVE_OPENGL
-    bool useGl;
-
-    MvOpenGlDrawCallback glDrawCallback;
-    void* glDrawData;
-#endif
-}
-MvWindow;
-
+typedef struct MvTrackbar
+{
+    GtkWidget* widget;
+    char* name;
+    struct MvTrackbar* next;
+    window_t* parent;
+    int* data;
+    int pos;
+    int maxval;
+    MvTrackbarCallback notify;
+    MvTrackbarCallback2 notify2;
+    void* userdata;
+}MvTrackbar;
 
 static gboolean imvOnClose( GtkWidget* widget, GdkEvent* event, gpointer user_data );
 static gboolean imvOnKeyPress( GtkWidget* widget, GdkEventKey* event, gpointer user_data );
@@ -402,9 +420,9 @@ GtkWidget*             mvTopLevelWidget = 0;
 #endif
 
 static int             last_key = -1;
-static MvWindow* hg_windows = 0;
+static window_t* hg_windows = 0;
 
-MV_IMPL int mvInitSystem( int argc, char** argv )
+int mvInitSystem( int argc, char** argv )
 {
     static int wasInitialized = 0;
 
@@ -416,17 +434,13 @@ MV_IMPL int mvInitSystem( int argc, char** argv )
         gtk_disable_setlocale();
         gtk_init( &argc, &argv );
 
-        #ifdef HAVE_OPENGL
-            gtk_gl_init(&argc, &argv);
-        #endif
-
         wasInitialized = 1;
     }
 
     return 0;
 }
 
-MV_IMPL int mvStartWindowThread(){
+int mvStartWindowThread(){
 #ifdef HAVE_GTHREAD
     mvInitSystem(0,NULL);
     if (!thread_started) {
@@ -481,18 +495,18 @@ if(thread_started && g_thread_self()!=window_thread){ g_mutex_unlock( window_mut
 #define MV_UNLOCK_MUTEX()
 #endif
 
-static MvWindow* imvFindWindowByName( const char* name )
+static window_t* imvFindWindowByName( const char* name )
 {
-    MvWindow* window = hg_windows;
+    window_t* window = hg_windows;
     while( window != 0 && strcmp(name, window->name) != 0 )
         window = window->next;
 
     return window;
 }
 
-static MvWindow* imvWindowByWidget( GtkWidget* widget )
+static window_t* imvWindowByWidget( GtkWidget* widget )
 {
-    MvWindow* window = hg_windows;
+    window_t* window = hg_windows;
 
     while( window != 0 && window->widget != widget &&
            window->frame != widget && window->paned != widget )
@@ -507,9 +521,7 @@ double mvGetModeWindow_GTK(const char* name)//YV
 
     MV_FUNCNAME( "mvGetModeWindow_GTK" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if (!name)
         MV_ERROR( MV_StsNullPtr, "NULL name string" );
@@ -522,7 +534,6 @@ double mvGetModeWindow_GTK(const char* name)//YV
     result = window->status;
     MV_UNLOCK_MUTEX();
 
-    __END__;
     return result;
 }
 
@@ -532,9 +543,7 @@ void mvSetModeWindow_GTK( const char* name, double prop_value)//Yannick Verdie
 
     MV_FUNCNAME( "mvSetModeWindow_GTK" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if(!name)
         MV_ERROR( MV_StsNullPtr, "NULL name string" );
@@ -542,9 +551,6 @@ void mvSetModeWindow_GTK( const char* name, double prop_value)//Yannick Verdie
     window = imvFindWindowByName( name );
     if( !window )
         MV_ERROR( MV_StsNullPtr, "NULL window" );
-
-    if(window->flags & MV_WINDOW_AUTOSIZE)//if the flag MV_WINDOW_AUTOSIZE is set
-        EXIT;
 
     //so easy to do fullscreen here, Linux rocks !
 
@@ -554,7 +560,7 @@ void mvSetModeWindow_GTK( const char* name, double prop_value)//Yannick Verdie
         gtk_window_unfullscreen(GTK_WINDOW(window->frame));
         window->status=MV_WINDOW_NORMAL;
         MV_UNLOCK_MUTEX();
-        EXIT;
+        exit(-1);
     }
 
     if (window->status==MV_WINDOW_NORMAL && prop_value==MV_WINDOW_FULLSCREEN)
@@ -563,10 +569,8 @@ void mvSetModeWindow_GTK( const char* name, double prop_value)//Yannick Verdie
         gtk_window_fullscreen(GTK_WINDOW(window->frame));
         window->status=MV_WINDOW_FULLSCREEN;
         MV_UNLOCK_MUTEX();
-        EXIT;
+        exit(-1);
     }
-
-    __END__;
 }
 
 
@@ -576,20 +580,14 @@ double mvGetPropWindowAutoSize_GTK(const char* name)
 
     MV_FUNCNAME( "mvGetPropWindowAutoSize_GTK" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if (!name)
         MV_ERROR( MV_StsNullPtr, "NULL name string" );
 
     window = imvFindWindowByName( name );
     if (!window)
-        EXIT; // keep silence here
-
-    result = window->flags & MV_WINDOW_AUTOSIZE;
-
-    __END__;
+        exit(-1); // keep silence here
 
     return result;
 }
@@ -600,20 +598,16 @@ double mvGetRatioWindow_GTK(const char* name)
 
     MV_FUNCNAME( "mvGetRatioWindow_GTK" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if (!name)
         MV_ERROR( MV_StsNullPtr, "NULL name string" );
 
     window = imvFindWindowByName( name );
     if (!window)
-        EXIT; // keep silence here
+        exit(-1); // keep silence here
 
-    result = static_cast<double>(window->widget->allocation.width) / window->widget->allocation.height;
-
-    __END__;
+    result = (window->widget->allocation.width) / window->widget->allocation.height;
 
     return result;
 }
@@ -622,107 +616,16 @@ double mvGetOpenGlProp_GTK(const char* name)
 {
     double result = -1;
 
-#ifdef HAVE_OPENGL
-    MV_FUNCNAME( "mvGetOpenGlProp_GTK" );
-
-    __BEGIN__;
-
-    MvWindow* window;
-
-    if (!name)
-        MV_ERROR( MV_StsNullPtr, "NULL name string" );
-
-    window = imvFindWindowByName( name );
-    if (!window)
-        EXIT; // keep silence here
-
-    result = window->useGl;
-
-    __END__;
-#else
     (void)name;
-#endif
 
     return result;
 }
 
-
-// OpenGL support
-
-#ifdef HAVE_OPENGL
-
-namespace
-{
-    void createGlContext(MvWindow* window)
-    {
-        GdkGLConfig* glconfig;
-
-        MV_FUNCNAME( "createGlContext" );
-
-        __BEGIN__;
-
-        // Try double-buffered visual
-        glconfig = gdk_gl_config_new_by_mode((GdkGLConfigMode)(GDK_GL_MODE_RGB | GDK_GL_MODE_DEPTH | GDK_GL_MODE_DOUBLE));
-        if (!glconfig)
-            MV_ERROR( MV_OpenGlApiCallError, "Can't Create A GL Device Context" );
-
-        // Set OpenGL-capability to the widget
-        if (!gtk_widget_set_gl_capability(window->widget, glconfig, NULL, TRUE, GDK_GL_RGBA_TYPE))
-            MV_ERROR( MV_OpenGlApiCallError, "Can't Create A GL Device Context" );
-
-        window->useGl = true;
-
-        __END__;
-    }
-
-    void drawGl(MvWindow* window)
-    {
-        MV_FUNCNAME( "drawGl" );
-
-        __BEGIN__;
-
-        GdkGLContext* glcontext = gtk_widget_get_gl_context(window->widget);
-        GdkGLDrawable* gldrawable = gtk_widget_get_gl_drawable(window->widget);
-
-        if (!gdk_gl_drawable_gl_begin (gldrawable, glcontext))
-            MV_ERROR( MV_OpenGlApiCallError, "Can't Activate The GL Rendering Context" );
-
-        glViewport(0, 0, window->widget->allocation.width, window->widget->allocation.height);
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        if (window->glDrawCallback)
-            window->glDrawCallback(window->glDrawData);
-
-        if (gdk_gl_drawable_is_double_buffered (gldrawable))
-            gdk_gl_drawable_swap_buffers(gldrawable);
-        else
-            glFlush();
-
-        gdk_gl_drawable_gl_end(gldrawable);
-
-        __END__;
-    }
-}
-
-#endif // HAVE_OPENGL
-
-
 static gboolean mvImageWidget_expose(GtkWidget* widget, GdkEventExpose* event, gpointer data)
 {
-#ifdef HAVE_OPENGL
-    MvWindow* window = (MvWindow*)data;
-
-    if (window->useGl)
-    {
-        drawGl(window);
-        return TRUE;
-    }
-#else
     (void)data;
-#endif
 
-  MvImageWidget *image_widget;
+  image_widget_t *image_widget;
 
   g_return_val_if_fail (widget != NULL, FALSE);
   g_return_val_if_fail (MV_IS_IMAGE_WIDGET (widget), FALSE);
@@ -757,14 +660,12 @@ static gboolean mvImageWidget_expose(GtkWidget* widget, GdkEventExpose* event, g
   return TRUE;
 }
 
-MV_IMPL int mvNamedWindow( const char* name, int flags )
+int mvNamedWindow( const char* name, int flags )
 {
     int result = 0;
     MV_FUNCNAME( "mvNamedWindow" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
     int len;
 
     mvInitSystem(1,(char**)&name);
@@ -775,23 +676,21 @@ MV_IMPL int mvNamedWindow( const char* name, int flags )
     if( imvFindWindowByName( name ) != 0 )
     {
         result = 1;
-        EXIT;
+        exit(-1);
     }
 
     len = strlen(name);
-    MV_CALL( window = (MvWindow*)mvAlloc(sizeof(MvWindow) + len + 1));
+    window = (window_t*)mvAlloc(sizeof(window_t) + len + 1);
     memset( window, 0, sizeof(*window));
     window->name = (char*)(window + 1);
     memcpy( window->name, name, len + 1 );
     window->flags = flags;
-    window->signature = MV_WINDOW_MAGIC_VAL;
     window->last_key = 0;
     window->on_mouse = 0;
     window->on_mouse_param = 0;
     memset( &window->toolbar, 0, sizeof(window->toolbar));
     window->next = hg_windows;
     window->prev = 0;
-    window->status = MV_WINDOW_NORMAL;//YV
 
     MV_LOCK_MUTEX();
 
@@ -804,20 +703,9 @@ MV_IMPL int mvNamedWindow( const char* name, int flags )
     gtk_container_add( GTK_CONTAINER(window->frame), window->paned );
     gtk_widget_show( window->paned );
 
-#ifndef HAVE_OPENGL
-    if (flags & MV_WINDOW_OPENGL)
-        MV_ERROR( MV_OpenGlNotSupported, "Library was built without OpenGL support" );
-#else
-    if (flags & MV_WINDOW_OPENGL)
-        createGlContext(window);
-
-    window->glDrawCallback = 0;
-    window->glDrawData = 0;
-#endif
-
     //
     // configure event handlers
-    // TODO -- move this to MvImageWidget ?
+    // TODO -- move this to image_widget_t ?
     gtk_signal_connect( GTK_OBJECT(window->frame), "key-press-event",
                         GTK_SIGNAL_FUNC(imvOnKeyPress), window );
     gtk_signal_connect( GTK_OBJECT(window->widget), "button-press-event",
@@ -840,114 +728,24 @@ MV_IMPL int mvNamedWindow( const char* name, int flags )
         hg_windows->prev = window;
     hg_windows = window;
 
-    gtk_window_set_resizable( GTK_WINDOW(window->frame), (flags & MV_WINDOW_AUTOSIZE) == 0 );
+    gtk_window_set_resizable( GTK_WINDOW(window->frame), 1 );
 
 
     // allow window to be resized
-    if( (flags & MV_WINDOW_AUTOSIZE)==0 ){
-        GdkGeometry geometry;
-        geometry.min_width = 50;
-        geometry.min_height = 50;
-        gtk_window_set_geometry_hints( GTK_WINDOW( window->frame ), GTK_WIDGET( window->widget ),
-            &geometry, (GdkWindowHints) (GDK_HINT_MIN_SIZE));
-    }
+    GdkGeometry geometry;
+    geometry.min_width = 50;
+    geometry.min_height = 50;
+    gtk_window_set_geometry_hints( GTK_WINDOW( window->frame ), GTK_WIDGET( window->widget ),
+        &geometry, (GdkWindowHints) (GDK_HINT_MIN_SIZE));
 
     MV_UNLOCK_MUTEX();
 
-#ifdef HAVE_OPENGL
-    if (window->useGl)
-        mvSetOpenGlContext(name);
-#endif
-
     result = 1;
-    __END__;
 
     return result;
 }
 
-
-#ifdef HAVE_OPENGL
-
-MV_IMPL void mvSetOpenGlContext(const char* name)
-{
-    MvWindow* window;
-    GdkGLContext* glcontext;
-    GdkGLDrawable* gldrawable;
-
-    MV_FUNCNAME( "mvSetOpenGlContext" );
-
-    __BEGIN__;
-
-    if(!name)
-        MV_ERROR( MV_StsNullPtr, "NULL name string" );
-
-    window = imvFindWindowByName( name );
-    if (!window)
-        MV_ERROR( MV_StsNullPtr, "NULL window" );
-
-    if (!window->useGl)
-        MV_ERROR( MV_OpenGlNotSupported, "Window doesn't support OpenGL" );
-
-    glcontext = gtk_widget_get_gl_context(window->widget);
-    gldrawable = gtk_widget_get_gl_drawable(window->widget);
-
-    if (!gdk_gl_drawable_make_current(gldrawable, glcontext))
-        MV_ERROR( MV_OpenGlApiCallError, "Can't Activate The GL Rendering Context" );
-
-    __END__;
-}
-
-MV_IMPL void mvUpdateWindow(const char* name)
-{
-    MV_FUNCNAME( "mvUpdateWindow" );
-
-    __BEGIN__;
-
-    MvWindow* window;
-
-    if (!name)
-        MV_ERROR( MV_StsNullPtr, "NULL name string" );
-
-    window = imvFindWindowByName( name );
-    if (!window)
-        EXIT;
-
-    // window does not refresh without this
-    gtk_widget_queue_draw( GTK_WIDGET(window->widget) );
-
-    __END__;
-}
-
-MV_IMPL void mvSetOpenGlDrawCallback(const char* name, MvOpenGlDrawCallback callback, void* userdata)
-{
-    MvWindow* window;
-
-    MV_FUNCNAME( "mvCreateOpenGLCallback" );
-
-    __BEGIN__;
-
-    if(!name)
-        MV_ERROR( MV_StsNullPtr, "NULL name string" );
-
-    window = imvFindWindowByName( name );
-    if( !window )
-        EXIT;
-
-    if (!window->useGl)
-        MV_ERROR( MV_OpenGlNotSupported, "Window was created without OpenGL context" );
-
-    window->glDrawCallback = callback;
-    window->glDrawData = userdata;
-
-    __END__;
-}
-
-#endif // HAVE_OPENGL
-
-
-
-
-static void imvDeleteWindow( MvWindow* window )
+static void imvDeleteWindow( window_t* window )
 {
     MvTrackbar* trackbar;
 
@@ -981,20 +779,18 @@ static void imvDeleteWindow( MvWindow* window )
 }
 
 
-MV_IMPL void mvDestroyWindow( const char* name )
+void mvDestroyWindow( const char* name )
 {
     MV_FUNCNAME( "mvDestroyWindow" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if(!name)
         MV_ERROR( MV_StsNullPtr, "NULL name string" );
 
     window = imvFindWindowByName( name );
     if( !window )
-        EXIT;
+        exit(-1);
 
     // note that it is possible for the update thread to run this function
     // if there is a call to mvShowImage in a mouse callback
@@ -1004,25 +800,23 @@ MV_IMPL void mvDestroyWindow( const char* name )
     imvDeleteWindow( window );
 
     MV_UNLOCK_MUTEX();
-
-    __END__;
 }
 
 
-MV_IMPL void
+void
 mvDestroyAllWindows( void )
 {
     MV_LOCK_MUTEX();
 
     while( hg_windows )
     {
-        MvWindow* window = hg_windows;
+        window_t* window = hg_windows;
         imvDeleteWindow( window );
     }
     MV_UNLOCK_MUTEX();
 }
 
-// MvSize imvCalcOptimalWindowSize( MvWindow * window, MvSize new_image_size){
+// MvSize imvCalcOptimalWindowSize( window_t * window, MvSize new_image_size){
 //     MvSize window_size;
 //     GtkWidget * toplevel = gtk_widget_get_toplevel( window->frame );
 //     gdk_drawable_get_size( GDK_DRAWABLE(toplevel->window),
@@ -1034,14 +828,12 @@ mvDestroyAllWindows( void )
 //     return window_size;
 // }
 
-MV_IMPL void
-mvShowImage( const char* name, const MvArr* arr )
+void
+mvShowImage( const char* name, const void* arr )
 {
     MV_FUNCNAME( "mvShowImage" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if( !name )
         MV_ERROR( MV_StsNullPtr, "NULL name" );
@@ -1057,45 +849,28 @@ mvShowImage( const char* name, const MvArr* arr )
 
     if( window && arr )
     {
-    #ifdef HAVE_OPENGL
-        if (window->useGl)
-        {
-            MvMat stub;
-            MvMat* mat = mvGetMat(arr, &stub);
-            mv::Mat im(mat);
-            mv::imshow(name, im);
-            return;
-        }
-    #endif
-
-        MvImageWidget * image_widget = MV_IMAGE_WIDGET( window->widget );
+        image_widget_t * image_widget = MV_IMAGE_WIDGET( window->widget );
         mvImageWidgetSetImage( image_widget, arr );
     }
 
     MV_UNLOCK_MUTEX();
-
-    __END__;
 }
 
-MV_IMPL void mvResizeWindow(const char* name, int width, int height )
+void mvResizeWindow(const char* name, int width, int height )
 {
     MV_FUNCNAME( "mvResizeWindow" );
 
-    __BEGIN__;
-
-    MvWindow* window;
-    MvImageWidget * image_widget;
+    window_t* window;
+    image_widget_t * image_widget;
 
     if( !name )
         MV_ERROR( MV_StsNullPtr, "NULL name" );
 
     window = imvFindWindowByName(name);
     if(!window)
-        EXIT;
+        exit(-1);
 
     image_widget = MV_IMAGE_WIDGET( window->widget );
-    //if(image_widget->flags & MV_WINDOW_AUTOSIZE)
-        //EXIT;
 
     MV_LOCK_MUTEX();
 
@@ -1107,38 +882,32 @@ MV_IMPL void mvResizeWindow(const char* name, int width, int height )
     image_widget->flags &= ~MV_WINDOW_NO_IMAGE;
 
     MV_UNLOCK_MUTEX();
-
-    __END__;
 }
 
 
-MV_IMPL void mvMoveWindow( const char* name, int x, int y )
+void mvMoveWindow( const char* name, int x, int y )
 {
     MV_FUNCNAME( "mvMoveWindow" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if( !name )
         MV_ERROR( MV_StsNullPtr, "NULL name" );
 
     window = imvFindWindowByName(name);
     if(!window)
-        EXIT;
+        exit(-1);
 
     MV_LOCK_MUTEX();
 
     gtk_window_move( GTK_WINDOW(window->frame), x, y );
 
     MV_UNLOCK_MUTEX();
-
-    __END__;
 }
 
 
 static MvTrackbar*
-imvFindTrackbarByName( const MvWindow* window, const char* name )
+imvFindTrackbarByName( const window_t* window, const char* name )
 {
     MvTrackbar* trackbar = window->toolbar.first;
 
@@ -1157,10 +926,8 @@ imvCreateTrackbar( const char* trackbar_name, const char* window_name,
 
     MV_FUNCNAME( "imvCreateTrackbar" );
 
-    __BEGIN__;
-
     /*char slider_name[32];*/
-    MvWindow* window = 0;
+    window_t* window = 0;
     MvTrackbar* trackbar = 0;
 
     if( !window_name || !trackbar_name )
@@ -1171,7 +938,7 @@ imvCreateTrackbar( const char* trackbar_name, const char* window_name,
 
     window = imvFindWindowByName(window_name);
     if( !window )
-        EXIT;
+        exit(-1);
 
     trackbar = imvFindTrackbarByName(window,trackbar_name);
 
@@ -1182,7 +949,6 @@ imvCreateTrackbar( const char* trackbar_name, const char* window_name,
         int len = strlen(trackbar_name);
         trackbar = (MvTrackbar*)mvAlloc(sizeof(MvTrackbar) + len + 1);
         memset( trackbar, 0, sizeof(*trackbar));
-        trackbar->signature = MV_TRACKBAR_MAGIC_VAL;
         trackbar->name = (char*)(trackbar+1);
         memcpy( trackbar->name, trackbar_name, len + 1 );
         trackbar->parent = window;
@@ -1235,13 +1001,11 @@ imvCreateTrackbar( const char* trackbar_name, const char* window_name,
 
     result = 1;
 
-    __END__;
-
     return result;
 }
 
 
-MV_IMPL int
+int
 mvCreateTrackbar( const char* trackbar_name, const char* window_name,
                   int* val, int count, MvTrackbarCallback on_notify )
 {
@@ -1250,7 +1014,7 @@ mvCreateTrackbar( const char* trackbar_name, const char* window_name,
 }
 
 
-MV_IMPL int
+int
 mvCreateTrackbar2( const char* trackbar_name, const char* window_name,
                    int* val, int count, MvTrackbarCallback2 on_notify2,
                    void* userdata )
@@ -1260,38 +1024,32 @@ mvCreateTrackbar2( const char* trackbar_name, const char* window_name,
 }
 
 
-MV_IMPL void
+void
 mvSetMouseCallback( const char* window_name, MvMouseCallback on_mouse, void* param )
 {
     MV_FUNCNAME( "mvSetMouseCallback" );
 
-    __BEGIN__;
-
-    MvWindow* window = 0;
+    window_t* window = 0;
 
     if( !window_name )
         MV_ERROR( MV_StsNullPtr, "NULL window name" );
 
     window = imvFindWindowByName(window_name);
     if( !window )
-        EXIT;
+        exit(-1);
 
     window->on_mouse = on_mouse;
     window->on_mouse_param = param;
-
-    __END__;
 }
 
 
-MV_IMPL int mvGetTrackbarPos( const char* trackbar_name, const char* window_name )
+int mvGetTrackbarPos( const char* trackbar_name, const char* window_name )
 {
     int pos = -1;
 
     MV_FUNCNAME( "mvGetTrackbarPos" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
     MvTrackbar* trackbar = 0;
 
     if( trackbar_name == 0 || window_name == 0 )
@@ -1304,19 +1062,15 @@ MV_IMPL int mvGetTrackbarPos( const char* trackbar_name, const char* window_name
     if( trackbar )
         pos = trackbar->pos;
 
-    __END__;
-
     return pos;
 }
 
 
-MV_IMPL void mvSetTrackbarPos( const char* trackbar_name, const char* window_name, int pos )
+void mvSetTrackbarPos( const char* trackbar_name, const char* window_name, int pos )
 {
     MV_FUNCNAME( "mvSetTrackbarPos" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
     MvTrackbar* trackbar = 0;
 
     if( trackbar_name == 0 || window_name == 0 )
@@ -1340,20 +1094,16 @@ MV_IMPL void mvSetTrackbarPos( const char* trackbar_name, const char* window_nam
     gtk_range_set_value( GTK_RANGE(trackbar->widget), pos );
 
     MV_UNLOCK_MUTEX();
-
-    __END__;
 }
 
 
-MV_IMPL void* mvGetWindowHandle( const char* window_name )
+void* mvGetWindowHandle( const char* window_name )
 {
     void* widget = 0;
 
     MV_FUNCNAME( "mvGetWindowHandle" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if( window_name == 0 )
         MV_ERROR( MV_StsNullPtr, "NULL window name" );
@@ -1362,21 +1112,17 @@ MV_IMPL void* mvGetWindowHandle( const char* window_name )
     if( window )
         widget = (void*)window->widget;
 
-    __END__;
-
     return widget;
 }
 
 
-MV_IMPL const char* mvGetWindowName( void* window_handle )
+const char* mvGetWindowName( void* window_handle )
 {
     const char* window_name = "";
 
     MV_FUNCNAME( "mvGetWindowName" );
 
-    __BEGIN__;
-
-    MvWindow* window;
+    window_t* window;
 
     if( window_handle == 0 )
         MV_ERROR( MV_StsNullPtr, "NULL window" );
@@ -1385,13 +1131,10 @@ MV_IMPL const char* mvGetWindowName( void* window_handle )
     if( window )
         window_name = window->name;
 
-    __END__;
-
     return window_name;
 }
 
-static gboolean imvOnKeyPress( GtkWidget * /*widget*/,
-                GdkEventKey* event, gpointer /*user_data*/ )
+static gboolean imvOnKeyPress( GtkWidget * widget, GdkEventKey* event, gpointer user_data )
 {
     int code = 0;
 
@@ -1436,8 +1179,7 @@ static void imvOnTrackbar( GtkWidget* widget, gpointer user_data )
     int pos = mvRound( gtk_range_get_value(GTK_RANGE(widget)));
     MvTrackbar* trackbar = (MvTrackbar*)user_data;
 
-    if( trackbar && trackbar->signature == MV_TRACKBAR_MAGIC_VAL &&
-        trackbar->widget == widget )
+    if( trackbar && trackbar->widget == widget )
     {
         trackbar->pos = pos;
         if( trackbar->data )
@@ -1449,11 +1191,10 @@ static void imvOnTrackbar( GtkWidget* widget, gpointer user_data )
     }
 }
 
-static gboolean imvOnClose( GtkWidget* widget, GdkEvent* /*event*/, gpointer user_data )
+static gboolean imvOnClose( GtkWidget* widget, GdkEvent* event, gpointer user_data )
 {
-    MvWindow* window = (MvWindow*)user_data;
-    if( window->signature == MV_WINDOW_MAGIC_VAL &&
-        window->frame == widget )
+    window_t* window = (window_t*)user_data;
+    if( window->frame == widget )
     {
         imvDeleteWindow(window);
     }
@@ -1463,25 +1204,20 @@ static gboolean imvOnClose( GtkWidget* widget, GdkEvent* /*event*/, gpointer use
 
 static gboolean imvOnMouse( GtkWidget *widget, GdkEvent *event, gpointer user_data )
 {
-    // TODO move this logic to MvImageWidget
-    MvWindow* window = (MvWindow*)user_data;
-    MvPoint2D32f pt32f = {-1., -1.};
-    MvPoint pt = {-1,-1};
+    // TODO move this logic to image_widget_t
+    window_t* window = (window_t*)user_data;
+    //MvPoint2D32f pt32f = {-1., -1.};
+    //MvPoint pt = {-1,-1};
     int mv_event = -1, state = 0;
-    MvImageWidget * image_widget = MV_IMAGE_WIDGET( widget );
-
-    if( window->signature != MV_WINDOW_MAGIC_VAL ||
-        window->widget != widget || !window->widget ||
-        !window->on_mouse /*|| !image_widget->original_image*/)
-        return FALSE;
+    image_widget_t * image_widget = MV_IMAGE_WIDGET( widget );
 
     if( event->type == GDK_MOTION_NOTIFY )
     {
         GdkEventMotion* event_motion = (GdkEventMotion*)event;
 
         mv_event = MV_EVENT_MOUSEMOVE;
-        pt32f.x = mvRound(event_motion->x);
-        pt32f.y = mvRound(event_motion->y);
+        //pt32f.x = mvRound(event_motion->x);
+        //pt32f.y = mvRound(event_motion->y);
         state = event_motion->state;
     }
     else if( event->type == GDK_BUTTON_PRESS ||
@@ -1489,8 +1225,8 @@ static gboolean imvOnMouse( GtkWidget *widget, GdkEvent *event, gpointer user_da
              event->type == GDK_2BUTTON_PRESS )
     {
         GdkEventButton* event_button = (GdkEventButton*)event;
-        pt32f.x = mvRound(event_button->x);
-        pt32f.y = mvRound(event_button->y);
+        //pt32f.x = mvRound(event_button->x);
+        //pt32f.y = mvRound(event_button->y);
 
 
         if( event_button->type == GDK_BUTTON_PRESS )
@@ -1516,19 +1252,17 @@ static gboolean imvOnMouse( GtkWidget *widget, GdkEvent *event, gpointer user_da
 
     if( mv_event >= 0 ){
         // scale point if image is scaled
-        if( (image_widget->flags & MV_WINDOW_AUTOSIZE)==0 &&
-             image_widget->original_image &&
-             image_widget->scaled_image ){
+        if(  image_widget->original_image && image_widget->scaled_image ){
             // image origin is not necessarily at (0,0)
             int x0 = (widget->allocation.width - image_widget->scaled_image->cols)/2;
             int y0 = (widget->allocation.height - image_widget->scaled_image->rows)/2;
-            pt.x = mvRound( ((pt32f.x-x0)*image_widget->original_image->cols)/
-                                            image_widget->scaled_image->cols );
-            pt.y = mvRound( ((pt32f.y-y0)*image_widget->original_image->rows)/
-                                            image_widget->scaled_image->rows );
+            //pt.x = mvRound( ((pt32f.x-x0)*image_widget->original_image->cols)/
+            //                                image_widget->scaled_image->cols );
+            //pt.y = mvRound( ((pt32f.y-y0)*image_widget->original_image->rows)/
+            ///                                image_widget->scaled_image->rows );
         }
         else{
-            pt = mvPointFrom32f( pt32f );
+            ;//pt = mvPointFrom32f( pt32f );
         }
 
 //        if((unsigned)pt.x < (unsigned)(image_widget->original_image->width) &&
@@ -1540,7 +1274,7 @@ static gboolean imvOnMouse( GtkWidget *widget, GdkEvent *event, gpointer user_da
                 (state & GDK_BUTTON1_MASK ? MV_EVENT_FLAG_LBUTTON : 0) |
                 (state & GDK_BUTTON2_MASK ? MV_EVENT_FLAG_MBUTTON : 0) |
                 (state & GDK_BUTTON3_MASK ? MV_EVENT_FLAG_RBUTTON : 0);
-            window->on_mouse( mv_event, pt.x, pt.y, flags, window->on_mouse_param );
+            //window->on_mouse( mv_event, pt.x, pt.y, flags, window->on_mouse_param );
         }
     }
 
@@ -1555,7 +1289,7 @@ static gboolean imvAlarm( gpointer user_data )
 }
 
 
-MV_IMPL int mvWaitKey( int delay )
+int mvWaitKey( int delay )
 {
 #ifdef HAVE_GTHREAD
     if(thread_started && g_thread_self()!=window_thread){
@@ -1598,9 +1332,4 @@ MV_IMPL int mvWaitKey( int delay )
     return last_key;
 }
 
-
-#endif  // HAVE_GTK
-#endif  // WIN32
-
 /* End of file. */
-
