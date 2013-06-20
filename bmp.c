@@ -152,13 +152,13 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
         row--;
         switch (ihdr.BitPerPels) {
             case 1:
-                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, IMG_DEPTH_8U);
-                image->ImageSize = ihdr.Width * ihdr.Height;
+                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 3, IMG_DEPTH_8U);
+                image->img_size = ihdr.Width * ihdr.Height;
                 if (NULL == image)
                     goto err1;
-                mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC1);
+                mat = mvCreateMat(ihdr.Height, ihdr.Width, MAT_8UC1);
                 mat1b2u8(data, row, ihdr.Width, mat);
-                image->Data = mat;
+                image->data = mat;
                 break;
 
             case 2:
@@ -177,13 +177,13 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 break;
                 
             case 24:
-                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 1, IMG_DEPTH_32S);
-                image->ImageSize = ihdr.Width * ihdr.Height;
+                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 3, IMG_DEPTH_8U);
+                image->img_size = ihdr.Width * ihdr.Height;
                 if (NULL == image)
                     goto err1;
-                mat = mvCreateMat(ihdr.Height, ihdr.Width, MV_8UC3);
-                mat24b2u32(data, mat);
-                image->Data = mat;
+                mat = mvCreateMat(ihdr.Height, ihdr.Width, MAT_8UC3);
+                mat24b2s32(data, row, ihdr.Width, mat);
+                image->data = mat;
                 break;
                 
             case 32:
@@ -194,9 +194,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
         }
 
     }
-    
-
-    
+        
 err3:
     free(data);
 err2:

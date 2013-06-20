@@ -11,11 +11,6 @@
 #include "types.h"
 #include "image.h"
 
-image_t* mvCreateImage(int width, int height, int channels)
-{
-    return NULL;
-}
-
 /* Only create image header */
 image_t* mvCreateImageHeader(int width, int height, int channels, int depth)
 {
@@ -24,13 +19,13 @@ image_t* mvCreateImageHeader(int width, int height, int channels, int depth)
 
 	image = malloc(sizeof(image_t));
 	if (NULL == image) {
-		return E_NOMEM;
+		return ERR_NOMEM;
 	}
 
-    image->Size = sizeof(image_t);
+    image->size = sizeof(image_t);
 	image->width = width;
 	image->height = height;
-	image->channels = channels;
+	image->chn = channels;
 	image->depth = depth;
 
 	return image;
@@ -49,12 +44,12 @@ image_t* mvCreateImage(int width, int height, int channels, int depth)
 
 	image = malloc(sizeof(image_t));
 	if (NULL == image) {
-		return E_NOMEM;
+		return ERR_NOMEM;
 	}
 
 	image->width = width;
 	image->height = height;
-	image->channels = channels;
+	image->chn = channels;
 	image->depth = depth;
 
 	return image;
@@ -68,14 +63,14 @@ IMAGE_TYPE mvGetImageType(const char* filename)
 	IMAGE_TYPE type;
 
 	if (NULL == filename || 0 == j)
-		return E_PARAM;
+		return ERR_PARAM;
 	
 	while (*(filename+j) == 0x20 && j > 0)
 		j--;
 
     /* all-blankspace file name */
     if (j == 0)
-        return E_PARAM;        
+        return ERR_PARAM;        
     
     i = j;
     while (*(filename+i) != '.' && i > 0)
@@ -101,7 +96,7 @@ image_t* mvLoadImage(const char* filename, int iscolor)
 
     type = mvGetImageType(filename);
     if (type < 0)
-        return E_PARAM;
+        return ERR_PARAM;
 
     switch (type) {
     case TYPE_BMP:
@@ -123,7 +118,7 @@ int mvSaveImage(const char* filename, image_t* image, int iscolor)
 {
 
 
-
+    return 0;
 }
 
 
