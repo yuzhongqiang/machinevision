@@ -10,7 +10,7 @@
 int main(int argc, char** argv)
 {
     image_t *image = NULL;
-
+    
     if (argc != 2) {
         printf("Usage: bitmap_test  <bitmap file name>\n");
         exit(-1);

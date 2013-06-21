@@ -18,20 +18,14 @@
 // Allocates underlying array data
 void mvCreateData( mat_t* mat)
 {
-    int step, total_size;
-    step = mat->step;
+    int total_size = mat->step*mat->rows + MV_MALLOC_ALIGN;
+    u8* buf = NULL;
 
-    if( mat->rows == 0 || mat->cols == 0 )
-        return;
-
-    if( step == 0 )
-        step = MAT_ELEM_SIZE(mat->type) * mat->cols;
-
-    int64 _total_size = (int64)step*mat->rows + MV_MALLOC_ALIGN;
-    total_size = (int)_total_size;
-    if(_total_size != (int64)total_size)
-        mvError(ERR_NOMEM, "Too big buffer is allocated" );
-    mat->data.ptr = (u8*)mvAlloc((int64)total_size);
+    buf = (u8*)malloc(total_size);
+    mat->data.ptr = buf;
+    //mat->data.ptr = (u8*)mvAlloc(total_size);
+    if (!mat->data.ptr)
+        mvError(ERR_NOMEM, "Too big buffer to allocated");
 }
 
 // Deallocates array's data

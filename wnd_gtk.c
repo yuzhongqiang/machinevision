@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "types.h"
 
+/* Of pixbuf, color order is {blue, green, red} */
 void mvShowImage(const char *name, image_t *image)
 {
     static int initialized = 0;
@@ -30,7 +31,7 @@ void mvShowImage(const char *name, image_t *image)
     GdkPixbuf* pixbuf = gdk_pixbuf_new_from_data(mat->data.ptr, GDK_COLORSPACE_RGB,
     								0,
     							    8,
-    							    mat->rows, mat->cols, mat->step,
+    							    mat->cols, mat->rows, mat->step,
     							    NULL, NULL);
 
     GtkWidget *img = gtk_image_new_from_pixbuf(pixbuf);

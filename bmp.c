@@ -37,7 +37,7 @@ typedef struct file_header_t {
     u16 Reserved1;  //0x00 0x00
     u16 Reserved2;  //0x00 0x00
     u32 OffBits;  //offset of image data area
-}file_header_t;
+}__attribute__((packed)) file_header_t;
 
 /* Bitmap info header */
 typedef struct info_header_t {
@@ -47,7 +47,7 @@ typedef struct info_header_t {
     u16 Planes;   //planes count, always 1
     u16 BitPerPels; //bits count per pixel
     u32 Compression;  //compression type: 
-                      /* 0: no compress;
+                      /* 0: no compress;x
 			      1: RLE 8 compression(BI_RLE8)
 			      2: RLE 4 compression(BI_RLE4)
 			      3: Bitfields(BI_BITFIELDS)  */
@@ -56,7 +56,7 @@ typedef struct info_header_t {
     u32 YPelsPerMeter; //vertical pixels per meter
     u32 ClrUsed;      //color used
     u32 ClrImportant;
-}info_header_t;
+}info_header_t __attribute__((aligned(1)));
 
 /* Color plane (optional) */
 typedef struct rgb_plate_t {
@@ -73,7 +73,7 @@ typedef struct rgb_pixel_t {
     u8 Blue;
 }rgb_pixel_t;
 
-MV_STATIC void mat1b2u8(u8* data, int row, u32 width, mat_t *mat)
+MV_STATIC void mat_1b2u8(u8* data, int row, u32 width, mat_t *mat)
 {
     int i = 7, w = 0;
     u8 mask;
@@ -88,14 +88,17 @@ MV_STATIC void mat1b2u8(u8* data, int row, u32 width, mat_t *mat)
     }
 }
 
-MV_STATIC void mat24b2s32(u8* data, int row, u32 width, mat_t *mat)
+MV_STATIC void mat_24b2s32(u8* data, int row, u32 width, mat_t *mat)
 {
-    int i = 0;
-    int* ptr = (int*)(mat->data.ptr + row * mat->step);
-
-    for (; i<width; i++) {
-        /* color order in bitmap file is {blue, green, red} */
-        ptr[i] = data[i] | data[i+1]<<8 | data[i+2]<<16;
+    int i;
+    
+    /* in data, the color order is {red, green, blue} */
+    u8* ptr = mat->data.ptr + row * mat->step;
+    for (i=0; i<width; i++) {
+        ptr[0] = data[i*3+2];
+        ptr[1] = data[i*3+1];
+        ptr[2] = data[i*3];
+        ptr += 3;
     }
 }
 
@@ -120,7 +123,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
 
     if (fread(&hdr, sizeof(file_header_t), 1, fp) != 1)
         goto err1;
-    if (hdr.Flag != 0x424d)  //"BM"
+    if (hdr.Flag != 0x4d42)  //"BM"  Little-endian
         goto err1;
 
     if (fread(&ihdr, sizeof(info_header_t), 1, fp) != 1)
@@ -147,18 +150,20 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     if (NULL == data)
         goto err2;
 
-    row = ihdr.Height;
+    /* create image and matrix */
+    image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 3, IMG_DEPTH_8U);
+    image->img_size = ihdr.Width * ihdr.Height;
+    if (NULL == image)
+        goto err1;
+    mat = mvCreateMat(ihdr.Height, ihdr.Width, MAT_8UC3);
+    image->data = mat;    
+
+    /* parse data */
+    row = ihdr.Height - 1;
     while (fread(data, line_bytes, 1, fp) == 1) {
-        row--;
         switch (ihdr.BitPerPels) {
             case 1:
-                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 3, IMG_DEPTH_8U);
-                image->img_size = ihdr.Width * ihdr.Height;
-                if (NULL == image)
-                    goto err1;
-                mat = mvCreateMat(ihdr.Height, ihdr.Width, MAT_8UC1);
-                mat1b2u8(data, row, ihdr.Width, mat);
-                image->data = mat;
+                mat_1b2u8(data, row, ihdr.Width, mat);
                 break;
 
             case 2:
@@ -177,13 +182,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 break;
                 
             case 24:
-                image = mvCreateImageHeader(ihdr.Width, ihdr.Height, 3, IMG_DEPTH_8U);
-                image->img_size = ihdr.Width * ihdr.Height;
-                if (NULL == image)
-                    goto err1;
-                mat = mvCreateMat(ihdr.Height, ihdr.Width, MAT_8UC3);
-                mat24b2s32(data, row, ihdr.Width, mat);
-                image->data = mat;
+                mat_24b2s32(data, row, ihdr.Width, mat);
                 break;
                 
             case 32:
@@ -193,8 +192,10 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
                 break;
         }
 
+        if (--row < 0)
+            break;
     }
-        
+
 err3:
     free(data);
 err2:
