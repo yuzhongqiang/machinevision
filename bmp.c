@@ -146,6 +146,7 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
 
     /* now file pointer to the data area */
     line_bytes = (ihdr.BitPerPels * ihdr.Width + 7) / 8;
+    line_bytes = (line_bytes + 3) / 4 *4;
     data = (u8*)mvAlloc(line_bytes);
     if (NULL == data)
         goto err2;
