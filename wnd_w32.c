@@ -6,7 +6,7 @@
 #include "gtk/gtk.h"
 #include <stdio.h>
 #include <commctrl.h>
-#incldue <winuser.h>
+#include <winuser.h>
 #include "types.h"
 
 static void FillBitmapInfo(BITMAPINFO *bmi, int width, int height, int bpp, int origin)

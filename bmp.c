@@ -73,10 +73,11 @@ typedef struct rgb_pixel_t {
     u8 Blue;
 }rgb_pixel_t;
 
-MV_STATIC void mat_1b2u8(u8* data, int row, u32 width, mat_t *mat)
+MV_STATIC void fill_row_1b(u8* data, int row, u32 width, mat_t *mat, rgb_plate_t *plate)
 {
     int i = 7, w = 0;
     u8 mask;
+	int plate_idx;
     u8* ptr = mat->data.ptr + row * mat->step;
 
     for (; w<width; w++) {
@@ -84,11 +85,67 @@ MV_STATIC void mat_1b2u8(u8* data, int row, u32 width, mat_t *mat)
         i--;
         if (i<0)
             i = 7;
-        ptr[w] = data[w/8] & mask ? 1 : 0;
+		plate_idx = data[w/8] & mask ? 1 : 0;
+
+        ptr[0] = plate[plate_idx].Red;
+        ptr[1] = plate[plate_idx].Green;
+        ptr[2] = plate[plate_idx].Blue;
+        ptr += 3;
     }
 }
 
-MV_STATIC void mat_24b2s32(u8* data, int row, u32 width, mat_t *mat)
+MV_STATIC void fill_row_4b(u8* data, int row, u32 width, mat_t *mat, rgb_plate_t *plate)
+{
+    int i;
+	int plate_idx;
+    u8* ptr = mat->data.ptr + row * mat->step;
+
+    for (i = 0; i < width; i++) {
+		if (i%2 ==0)
+			plate_idx = (data[i/2] & 0xf0) >> 4;
+		else
+			plate_idx = data[i/2] & 0x0f;
+
+        ptr[0] = plate[plate_idx].Red;
+        ptr[1] = plate[plate_idx].Green;
+        ptr[2] = plate[plate_idx].Blue;
+        ptr += 3;
+    }
+}
+
+MV_STATIC void fill_row_8b(u8* data, int row, u32 width, mat_t *mat, rgb_plate_t *plate)
+{
+    int i;
+	int plate_idx;
+    u8* ptr = mat->data.ptr + row * mat->step;
+
+    for (i = 0; i < width; i++) {
+		plate_idx = data[i];
+
+        ptr[0] = plate[plate_idx].Red;
+        ptr[1] = plate[plate_idx].Green;
+        ptr[2] = plate[plate_idx].Blue;
+        ptr += 3;
+    }
+}
+
+MV_STATIC void fill_row_16b(u8* data, int row, u32 width, mat_t *mat, rgb_plate_t *plate)
+{
+    int i;
+	int plate_idx;
+    u8* ptr = mat->data.ptr + row * mat->step;
+
+    for (i = 0; i < width; i += 2) {
+		plate_idx = data[i] | data[i+1] << 8;
+
+        ptr[0] = plate[plate_idx].Red;
+        ptr[1] = plate[plate_idx].Green;
+        ptr[2] = plate[plate_idx].Blue;
+        ptr += 3;
+    }
+}
+
+MV_STATIC void fill_row_24b(u8* data, int row, u32 width, mat_t *mat)
 {
     int i;
     
@@ -164,26 +221,26 @@ image_t* bmpLoadImage(const char* filename, int iscolor)
     while (fread(data, line_bytes, 1, fp) == 1) {
         switch (ihdr.BitPerPels) {
             case 1:
-                mat_1b2u8(data, row, ihdr.Width, mat);
-                break;
-
-            case 2:
+                fill_row_1b(data, row, ihdr.Width, mat, plate);
                 break;
 
             case 4:
+                fill_row_4b(data, row, ihdr.Width, mat, plate);
                 break;
 
             case 8:
+                fill_row_8b(data, row, ihdr.Width, mat, plate);
                 break;
 
             case 15:
                 break;
                 
             case 16:
+                fill_row_16b(data, row, ihdr.Width, mat, plate);
                 break;
                 
             case 24:
-                mat_24b2s32(data, row, ihdr.Width, mat);
+                fill_row_24b(data, row, ihdr.Width, mat);
                 break;
                 
             case 32:
