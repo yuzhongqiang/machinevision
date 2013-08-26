@@ -13,7 +13,7 @@
 ---------------------------------------
 SOI    D8     文件头
 EOI    D9     文件尾
-SOF0   C0     帧开始（标准 JPEG）
+SOF0   C0     帧开始（标准 JPEG）	
 SOF1   C1     同上
 DHT    C4     定义 Huffman 表（霍夫曼表）
 SOS    DA     扫描行开始
