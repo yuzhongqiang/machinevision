@@ -55,31 +55,49 @@ image_t* jpegLoadImage(const char* filename, int iscolor)
 
 		switch (buf[1]) {
 			case M_SOF0	:
-
-				
+				GET_SEG_LEN;
+				sof0 = (seg_sof0_t*)malloc(len+2);
+				sof0->hdr.flag = 0xFF;
+				sof0->hdr.id = 0xC0;
+				fread(fp, sizeof(char), len-2, &sof0->pricise);					
 				break;
 
-			case M_JPG	:
-			case M_SOF9	:
-			case M_SOF10 :
-			case M_SOF11 :
-
-
-
 			case M_DHT	:
+				GET_SEG_LEN;
+				dht = (seg_dht_t*)malloc(len+2);
+				dht->hdr.flag = 0xFF;
+				dht->hdr.id = 0xDB;
+				fread(fp, sizeof(char), len-2, &dht->info); 
+				break;
 
-
-			case M_SOI	:
-			case M_EOI	:  // end of image
+			case M_SOI	:break;
+			case M_EOI	:break;  // end of image
 				break;
 				
 			case M_SOS	:
+				GET_SEG_LEN;
+				sos = (seg_sos_t*)malloc(len+2);
+				sos->hdr.flag = 0xFF;
+				sos->hdr.id = 0xDA;
+				fread(fp, sizeof(char), len-2, &sos->comp_count);	
+				break;
+				
 			case M_DQT	:
-			case M_DNL	:
+				GET_SEG_LEN;
+				dqt = (seg_dqt_t*)malloc(len+2);
+				dqt->hdr.flag = 0xFF;
+				dqt->hdr.id = 0xDB;
+				fread(fp, sizeof(char), len-2, &dqt->info);				
+				break;
+				
 			case M_DRI	:
-			case M_DHP	:
-			case M_EXP	:
-
+				GET_SEG_LEN;
+				dri = (seg_dqt_t*)malloc(len+2);
+				dri->hdr.flag = 0xFF;
+				dri->hdr.id = 0xDD;
+				fread(fp, sizeof(char), len-2, &dri->info);	
+				break;
+				
 			case M_APP0	:			
 				GET_SEG_LEN;
 				app0 = (seg_app0_t*)malloc(len+2);
@@ -92,7 +110,7 @@ image_t* jpegLoadImage(const char* filename, int iscolor)
 				com = (seg_com_t*)malloc(len+2);
 				com->hdr.flag = 0xFF;
 				com->hdr.id = 0xFE;
-				fread(fp, sizeof(char), len-2, com->jfif);	
+				fread(fp, sizeof(char), len-2, com->comment);	
 				break;
 
 			default:
@@ -100,7 +118,7 @@ image_t* jpegLoadImage(const char* filename, int iscolor)
 		}
 	}
 
-    
+    fclose(fp);
     return image;  
 
 err1:
