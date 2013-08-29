@@ -102,7 +102,7 @@ typedef struct seg_header_t {
 */
 typedef struct seg_soi_t {
 	seg_header_t hdr;	// 0xFF 0xD8
-}seg_eoi_t;
+}seg_soi_t;
 
 
 
@@ -138,7 +138,7 @@ typedef struct seg_app0_t {
 	seg_header_t hdr;  // 0xFF 0xE0
 	u16 length;        // length include this "length" field + content
 					   //0x10 or 16+3n
-	char[5] jfif;        //"JFIF\0"
+	char jfif[5];        //"JFIF\0"
 	u8  major;
 	u8  minor;
 	u16 xdensity;
@@ -192,7 +192,7 @@ typedef struct seg_dqt_t {
 	u16 length;   // 2 + 1 + n  (n=64*QTBytes)
 	u8 info;   // bit0-bit3: ID;  bit4-bit7 -0: 8bits, others 16bits
 	u8 data[0];  // 64*QTBytes
-};
+}seg_dqt_t;
 
 /*
 表7：SOF0（图像基本信息）
@@ -233,7 +233,7 @@ typedef struct seg_sof0_t {
 	u8 id;    // component id: 1=Y; 2-Cb; 3-Cr; 4-I; 5-Q
 	u8 sample_ratio;  // bit0-bit3: vertical; bit4-bit7: horizontal
 	u8 table_no;
-};
+}seg_sof0_t;
 
 /*
 表8：DHT（定义Huffman表）
@@ -292,7 +292,7 @@ typedef struct seg_dht_t {
 typedef struct seg_dri_t {
 	seg_header_t hdr;  // 0xFF 0xDD
 	u16 length;   // 4
-	u16 interal;  // n
+	u16 interval;  // n
 }seg_dri_t;
 
 

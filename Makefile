@@ -2,7 +2,7 @@
 
 CC = gcc
 
-LIB_FILELIST := utils.c mat.c bmp.c wnd_gtk.c image.c
+LIB_FILELIST := utils.c mat.c bmp.c wnd_gtk.c image.c jpeg.c
 CURR_DIR := $(shell pwd)
 
 INC_DIR := ./include/
@@ -27,3 +27,4 @@ bmp_test:
 
 clean:
 	rm *.o  *.a  -f
+	rm -r bmp_test

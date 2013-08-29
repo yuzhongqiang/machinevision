@@ -30,6 +30,7 @@ image_t* jpegLoadImage(const char* filename, int iscolor)
 	int len = 0;
 	FILE *fp;
 	unsigned char buf[1024];
+	image_t * image;
 
 	memset(buf, 0, sizeof(buf));
 
@@ -95,7 +96,7 @@ image_t* jpegLoadImage(const char* filename, int iscolor)
 				dri = (seg_dqt_t*)malloc(len+2);
 				dri->hdr.flag = 0xFF;
 				dri->hdr.id = 0xDD;
-				fread(fp, sizeof(char), len-2, &dri->info);	
+				fread(fp, sizeof(char), len-2, &dri->interval);	
 				break;
 				
 			case M_APP0	:			
