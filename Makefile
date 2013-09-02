@@ -23,7 +23,7 @@ lib:$(LIB_FILELIST)
 
 .PHONY: bmp_test clean
 bmp_test:
-	$(CC) -o bmp_test bmp_test.c -I$(INC_DIR) -I$(GTK_INC) -L./ -lmv $(GTK_LIB)
+	$(CC) -ggdb -o bmp_test bmp_test.c -I$(INC_DIR) -I$(GTK_INC) -L./ -lmv $(GTK_LIB)
 
 clean:
 	rm *.o  *.a  -f
